@@ -1,0 +1,21 @@
+{
+  "name": "json-api-schema",
+  "version": "1.0.0",
+  "description": "Validates a json-api object",
+  "main": "dist/src/main/index.js",
+  "types": "dist/src/main/index.d.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc -d"
+  },
+  "author": "anyhowstep",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AnyhowStep/json-api-schema"
+  },
+  "dependencies": {
+    "schema-decorator": "^1.15.0",
+    "typescript": "^2.8.0-dev.20180214"
+  }
+}
