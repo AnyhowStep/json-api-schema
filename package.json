@@ -1,5 +1,5 @@
 {
-  "name": "json-api-schema",
+  "name": "@anyhowstep/json-api-schema",
   "version": "1.0.0",
   "description": "Validates a json-api object",
   "main": "dist/src/main/index.js",
