@@ -1,6 +1,6 @@
 {
   "name": "@anyhowstep/json-api-schema",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Validates a json-api object",
   "main": "dist/src/main/index.js",
   "types": "dist/src/main/index.d.ts",
