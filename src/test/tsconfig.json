@@ -1,6 +1,5 @@
 {
     "compilerOptions": {
-        "outDir": "./dist/src/main",
         "sourceMap": true,
 
         "experimentalDecorators": true,
@@ -33,6 +32,7 @@
     "compileOnSave": false,
 
     "include": [
-        "./src/main/**/*"
+        "../../src/main/**/*",
+        "../../src/test/**/*"
     ]
 }

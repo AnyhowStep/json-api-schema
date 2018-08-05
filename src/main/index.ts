@@ -1,108 +1,112 @@
 import * as sd from "schema-decorator";
 //TODO restrict member names? http://jsonapi.org/format/#document-member-names
 
-export const assertDictionary : sd.AssertDelegate<{ [field : string] : any }> = (name : string, mixed : any) : { [field : string] : any } => {
-    if (!(mixed instanceof Object)) {
-        throw new Error(`Expected ${name} to be an Object; received ${typeof mixed}(${mixed})`);
+export type AnyDictionary = { [field : string] : any };
+export const anyDictionary : sd.AssertDelegate<AnyDictionary> = (
+    (name : string, mixed : any) : AnyDictionary => {
+        if (!(mixed instanceof Object)) {
+            throw new Error(`Expected ${name} to be an Object; received ${typeof mixed}(${mixed})`);
+        }
+        if (
+            (mixed instanceof Date) ||
+            (mixed instanceof Array) ||
+            (mixed instanceof Function) ||
+            (mixed instanceof Boolean) ||
+            (mixed instanceof Number) ||
+            (mixed instanceof String) ||
+            (mixed instanceof Symbol)
+        ) {
+            throw new Error(`Expected ${name} to be an Object`);
+        }
+        return mixed;
     }
-    if (
-        (mixed instanceof Date) ||
-        (mixed instanceof Array) ||
-        (mixed instanceof Function) ||
-        (mixed instanceof Boolean) ||
-        (mixed instanceof Number) ||
-        (mixed instanceof String) ||
-        (mixed instanceof Symbol)
-    ) {
-        throw new Error(`Expected ${name} to be an Object`);
-    }
-    return mixed;
-};
+);
 
 //http://jsonapi.org/format
 //The following is made with the v1.0 spec
-export interface Meta {
-    [field : string] : any
+export type Meta = AnyDictionary;
+export const meta : sd.AssertDelegate<Meta> = anyDictionary;
+
+export interface Link {
+    href : string,
+    meta? : undefined|null|Meta,
 }
-export const assertMeta : sd.AssertDelegate<Meta> = assertDictionary;
 //http://jsonapi.org/format/#document-links
-export class Link {
+export const link : sd.AssertDelegate<Link> = sd.toSchema({
     //a string containing the link’s URL.
-    @sd.assert(sd.string())
-    href : string = "http://example.com";
+    href : sd.string(),
     //a meta object containing non-standard meta-information about the link.
-    @sd.assert(sd.maybe(assertMeta))
-    meta?: null|Meta;
-}
+    meta : sd.maybe(meta),
+});
+
+export const stringOrLink : sd.AssertDelegate<string|Link> = sd.or(
+    sd.string(),
+    link
+);
+
 export interface LinkCollection {
     [field : string] : undefined|null|string|Link,
     //MAY have
-    self? : null|string|Link,
-    related? : null|string|Link,
+    self?    : undefined|null|string|Link,
+    related? : undefined|null|string|Link,
     //MAY provide links to traverse a paginated data set (“pagination links”).
-    first? : null|string|Link,
-    last? : null|string|Link,
-    prev? : null|string|Link,
-    next? : null|string|Link,
+    first? : undefined|null|string|Link,
+    last?  : undefined|null|string|Link,
+    prev?  : undefined|null|string|Link,
+    next?  : undefined|null|string|Link,
 }
-export const assertStringOrLink : sd.AssertDelegate<string|Link> = sd.or<string|Link>(
-    sd.string(),
-    sd.nested(Link)
+export const linkCollection : sd.AssertDelegate<LinkCollection> = sd.dictionary(
+    sd.maybe(stringOrLink)
 );
-export const assertLinkCollection : sd.AssertDelegate<LinkCollection> = (name : string, mixed : any) : LinkCollection => {
-    mixed = assertDictionary(name, mixed);
-    for (let field in mixed) {
-        if (mixed.hasOwnProperty(field)) {
-            mixed[field] = assertStringOrLink(`${name}[${field}]`, mixed[field]);
-        }
-    }
-    return mixed;
-};
+
 export interface ErrorLinkCollection extends LinkCollection {
     about : string|Link
 }
-export const assertErrorLinkCollection : sd.AssertDelegate<ErrorLinkCollection> = sd.and(
-    assertLinkCollection,
-    (name : string, mixed : any) => {
-        if (mixed.about != undefined) {
-            return mixed;
-        } else {
-            throw new Error(`Expected ${name} to have field "about"`);
-        }
-    }
+export const errorLinkCollection : sd.AssertDelegate<ErrorLinkCollection> = sd.intersect(
+    linkCollection,
+    sd.toSchema({
+        about : stringOrLink
+    })
 );
-export class ErrorSource {
+
+export interface ErrorSource {
     //https://tools.ietf.org/html/rfc6901
-    @sd.assert(sd.maybe(sd.string()))
-    pointer? : null|string;
+    pointer? : undefined|null|string;
     //a string indicating which URI query parameter caused the error.
-    @sd.assert(sd.maybe(sd.string()))
-    parameter? : null|string;
+    parameter? : undefined|null|string;
 }
+export const errorSource : sd.AssertDelegate<ErrorSource> = sd.toSchema({
+    pointer : sd.maybe(sd.string()),
+    parameter : sd.maybe(sd.string()),
+});
+
 //http://jsonapi.org/format/#errors-processing
-export class ErrorObject {
+export interface ErrorObject {
     //a unique identifier for this particular occurrence of the problem.
-    @sd.assert(sd.maybe(sd.string()))
-    id? : null|string;
-    @sd.assert(sd.maybe(assertErrorLinkCollection))
-    links?: null|ErrorLinkCollection;
+    id? : undefined|null|string;
+    links?: undefined|null|ErrorLinkCollection;
     //the HTTP status code applicable to this problem, expressed as a string value.
-    @sd.assert(sd.maybe(sd.string()))
-    status?: null|string;
+    status?: undefined|null|string;
     //an application-specific error code, expressed as a string value.
-    @sd.assert(sd.maybe(sd.string()))
-    code?: null|string;
+    code?: undefined|null|string;
     //a short, human-readable summary of the problem that SHOULD NOT change from occurrence to occurrence of the problem, except for purposes of localization.
-    @sd.assert(sd.maybe(sd.string()))
-    title? : null|string;
+    title? : undefined|null|string;
     //a human-readable explanation specific to this occurrence of the problem. Like title, this field’s value can be localized.
-    @sd.assert(sd.maybe(sd.string()))
-    detail? : null|string;
-    @sd.assert(sd.maybe(sd.nested(ErrorSource)))
-    source? : null|ErrorSource;
-    @sd.assert(sd.maybe(assertMeta))
-    meta? : null|Meta;
+    detail? : undefined|null|string;
+    source? : undefined|null|ErrorSource;
+    meta? : undefined|null|Meta;
 }
+export const errorObject : sd.AssertDelegate<ErrorObject> = sd.toSchema({
+    id : sd.maybe(sd.string()),
+    links : sd.maybe(errorLinkCollection),
+    status : sd.maybe(sd.string()),
+    code : sd.maybe(sd.string()),
+    title : sd.maybe(sd.string()),
+    detail : sd.maybe(sd.string()),
+    source : sd.maybe(errorSource),
+    meta : sd.maybe(meta),
+});
+
 //http://jsonapi.org/format/#document-resource-object-attributes
 export interface AttributeCollection {
     /*
@@ -114,141 +118,440 @@ export interface AttributeCollection {
     */
     [field : string] : any;
 }
-export const assertAttributeCollection : sd.AssertDelegate<AttributeCollection> = assertDictionary;
+export const attributeCollection : sd.AssertDelegate<AttributeCollection> = anyDictionary;
 
-export class ResourceIdentifier {
-    @sd.assert(sd.string())
-    type : string = "";
-    @sd.assert(sd.string())
-    id   : string = "";
-    @sd.assert(sd.maybe(assertMeta))
-    meta? : null|Meta;
+export interface ResourceIdentifier {
+    type : string;
+    id   : string;
+    meta? : undefined|null|Meta;
 }
+export const resourceIdentifier : sd.AssertDelegate<ResourceIdentifier> = sd.toSchema({
+    type : sd.string(),
+    id : sd.string(),
+    meta : sd.maybe(meta),
+});
 
 export type ResourceLinkage = ResourceIdentifier | (ResourceIdentifier[]);
-
-export const assertResourceLinkage : sd.AssertDelegate<ResourceLinkage> = sd.or<ResourceLinkage>(
-    sd.nested(ResourceIdentifier),
-    sd.array(sd.nested(ResourceIdentifier))
+export const resourceLinkage : sd.AssertDelegate<ResourceLinkage> = sd.or(
+    resourceIdentifier,
+    sd.array(resourceIdentifier)
 );
 
-export class Relationship {
+export interface PartialRelationship {
     //A “relationship object” MUST contain at least one of the following:
-    @sd.assert(sd.maybe(assertLinkCollection))
-    links? : null|LinkCollection;
-    @sd.assert(sd.maybe(assertResourceLinkage))
-    data? : null|ResourceLinkage;
-    @sd.assert(sd.maybe(assertMeta))
-    meta? : null|Meta;
+    links? : undefined|null|LinkCollection;
+    data? : undefined|null|ResourceLinkage;
+    meta? : undefined|null|Meta;
 }
+export const partialRelationship : sd.AssertDelegate<PartialRelationship> = sd.toSchema({
+    links : sd.maybe(linkCollection),
+    data : sd.maybe(resourceLinkage),
+    meta : sd.maybe(meta),
+});
+export type Relationship = (
+    (PartialRelationship & { links : LinkCollection }) |
+    (PartialRelationship & { data : ResourceLinkage }) |
+    (PartialRelationship & { meta : Meta })
+);
+export const relationship : sd.AssertDelegate<Relationship> = sd.or(
+    sd.intersect(partialRelationship, sd.toSchema({ links : linkCollection })),
+    sd.intersect(partialRelationship, sd.toSchema({ data : resourceLinkage })),
+    sd.intersect(partialRelationship, sd.toSchema({ meta : meta }))
+);
 
-export const assertRelationship : sd.AssertDelegate<Relationship> = (name : string, mixed : any) : Relationship => {
-    mixed = sd.toClass(name, mixed, Relationship);
-    if (mixed.links == undefined && mixed.data == undefined && mixed.meta == undefined) {
-        throw new Error(`Expected ${name} to have at least one of the following; links, data, meta`);
-    }
-    return mixed;
-};
-
-export class Resource {
+export interface Resource {
     //A resource object MUST contain at least the following top-level members:
-    //Exception: The id member is not required when the resource object originates at the client and represents a new resource to be created on the server.
-    @sd.assert(sd.maybe(sd.string()))
-    id?: null|string;
-    @sd.assert(sd.string())
-    type: string = "";
+    //Exception: The id member is not required when the resource object originates
+    //at the client and represents a new resource to be created on the server.
+    id?: undefined|null|string;
+    type: string;
 
     //In addition, a resource object MAY contain any of these top-level members:
-    @sd.assert(sd.maybe(assertAttributeCollection))
-    attributes? : null|AttributeCollection;
-    @sd.assert(sd.maybe(assertRelationship))
-    relationships? : null|Relationship;
-    @sd.assert(sd.maybe(assertLinkCollection))
-    links?: null|LinkCollection;
-    @sd.assert(sd.maybe(assertMeta))
-    meta?: null|Meta;
+    attributes? : undefined|null|AttributeCollection;
+    relationships? : undefined|null|Relationship;
+    links?: undefined|null|LinkCollection;
+    meta?: undefined|null|Meta;
 }
+export const resource : sd.AssertDelegate<Resource> = sd.toSchema({
+    id : sd.maybe(sd.string()),
+    type : sd.string(),
 
-export const assertServerResource : sd.AssertDelegate<Resource> = (name : string, mixed : any) : Resource => {
-    mixed = sd.toClass(name, mixed, Resource);
-    if (mixed.id == undefined) {
-        throw new Error(`Expected ${name} to have an "id" field as it originates on the server`);
-    }
-    return mixed;
-};
+    attributes : sd.maybe(attributeCollection),
+    relationships : sd.maybe(relationship),
+    links : sd.maybe(linkCollection),
+    meta : sd.maybe(meta),
+});
 
-export class JsonApi {
-    version?: null|"1.0";
-    meta? : null|Meta;
+export interface ServerResource extends Resource {
+    id : string;
 }
-export interface Document<T=any> {
+export const serverResource : sd.AssertDelegate<ServerResource> = sd.intersect(
+    resource,
+    sd.toSchema({
+        id : sd.string(),
+    })
+);
+
+export interface JsonApi {
+    version?: undefined|null|"1.0";
+    meta? : undefined|null|Meta;
+}
+export const jsonApi : sd.AssertDelegate<JsonApi> = sd.toSchema({
+    version : sd.maybe(sd.literal("1.0")),
+    meta : sd.maybe(meta),
+});
+
+export interface PartialDocument<DataT, MetaT extends undefined|null|Meta> {
     //http://jsonapi.org/format/#document-top-level
     //A document MUST contain at least one of the following top-level members:
     //The members data and errors MUST NOT coexist in the same document.
-    data?: null|T,
-    errors? : null|(ErrorObject[]),
-    meta? : null|Meta,
+    data?: undefined|null|DataT,
+    errors? : undefined|null|(ErrorObject[]),
+    meta? : undefined|null|MetaT,
 
     //A document MAY contain any of these top-level members:
-    jsonapi?: null|JsonApi,
-    links? : null|LinkCollection,
-    included? : null|(Resource[]),
+    jsonapi?: undefined|null|JsonApi,
+    links? : undefined|null|LinkCollection,
+    included? : undefined|null|(Resource[])|(ServerResource[]),
 }
-export function createDocument<T> (assertion : sd.Assertion<T>) : {
-    ctor : {new():Document<T>},
-    assertDelegate : sd.AssertDelegate<Document<T>>,
-    assertion : sd.Assertion<Document<T>>,
-} {
-    class DocumentClass implements Document<T> {
-        @sd.assert(sd.maybe(assertion.isCtor ?
-            sd.nested(assertion.func) :
-            assertion.func
-        ))
-        data?: null|T;
-        @sd.assert(sd.maybe(sd.array(sd.nested(ErrorObject))))
-        errors? : null|(ErrorObject[]);
-        @sd.assert(sd.maybe(assertMeta))
-        meta? : null|Meta;
-        @sd.assert(sd.maybe(sd.nested(JsonApi)))
-        jsonapi?: null|JsonApi;
-        @sd.assert(sd.maybe(assertLinkCollection))
-        links? : null|LinkCollection;
-        @sd.assert(sd.maybe(sd.array(sd.nested(Resource))))
-        included? : null|(Resource[]);
+export function partialDocument<
+    DataF extends sd.AnyAssertFunc,
+    MetaF extends sd.AssertFunc<undefined|null|Meta>
+> (
+    dataF : DataF,
+    metaF : MetaF
+) : (
+    sd.AssertDelegate<PartialDocument<
+        sd.TypeOf<DataF>,
+        sd.TypeOf<MetaF>
+    >> &
+    {
+        __accepts : (
+            PartialDocument<
+                sd.AcceptsOf<DataF>,
+                sd.AcceptsOf<MetaF>
+            >
+        )
     }
-    const assertDelegate : sd.AssertDelegate<Document<T>> = (name : string, mixed : any) : Document<T> => {
-        mixed = sd.toClass(name, mixed, DocumentClass);
-        if (mixed.data == undefined && mixed.errors == undefined && mixed.meta == undefined) {
-            throw new Error(`Expected ${name} to have at least one of the following; data, errors, meta`);
+) {
+    const r : (
+        sd.AssertDelegate<PartialDocument<
+            sd.TypeOf<DataF>,
+            //This `any` hack is because TS has a problem with
+            //Mapping `T extends { [field : string] : any }`
+            any
+        >> &
+        {
+            __accepts : (
+                PartialDocument<
+                    sd.AcceptsOf<DataF>,
+                    //This `any` hack is because TS has a problem with
+                    //Mapping `T extends { [field : string] : any }`
+                    any
+                >
+            )
         }
-        if (mixed.data != undefined && mixed.errors != undefined) {
-            throw new Error(`${name} cannot have both "data" and "errors" set`);
-        }
-        return mixed;
-    };
-    return {
-        ctor : DocumentClass,
-        assertDelegate : assertDelegate,
-        assertion : {
-            isCtor : false,
-            func   : assertDelegate,
-        },
-    };
-}
-export function createDocumentWithCtor<T> (ctor : {new():T}) {
-    return createDocument({
-        isCtor : true,
-        func : ctor,
+    ) = sd.toSchema({
+        data : sd.maybe(dataF),
+        errors : sd.maybe(sd.array(errorObject)),
+        meta : sd.maybe(metaF),
+
+        jsonapi : sd.maybe(jsonApi),
+        links : sd.maybe(linkCollection),
+        included : sd.maybe(sd.or(
+            sd.array(resource),
+            sd.array(serverResource)
+        ))
     });
-}
-export function createDocumentWithDelegate<T> (assertDelegate : sd.AssertDelegate<T>) {
-    return createDocument({
-        isCtor : false,
-        func : assertDelegate,
-    });
+    return r;
 }
 
-//1 `data`
-//8 `meta`
-//0-N `Resource`
-    //1 `AttributeCollection`
+/*
+    data, errors, meta
+
+    + At least one must be present
+    + data and errors MUST NOT coexist
+
+    + data
+    + data, meta
+    + errors
+    + errors, meta
+    + meta
+*/
+//Cannot have both DataT, and MetaT have undefined|null
+export type Document<DataT, MetaT extends undefined|null|Meta> = (
+    undefined extends MetaT ?
+    (
+        undefined extends DataT ?
+        //Cannot both have undefined|null
+        never :
+        null extends DataT ?
+        //Cannot both have undefined|null
+        never :
+        (
+            PartialDocument<DataT, MetaT> &
+            {
+                data : DataT
+            }
+        )
+    ) :
+    null extends MetaT ?
+    (
+        undefined extends DataT ?
+        //Cannot both have undefined|null
+        never :
+        null extends DataT ?
+        //Cannot both have undefined|null
+        never :
+        (
+            PartialDocument<DataT, MetaT> &
+            {
+                data : DataT
+            }
+        )
+    ) :
+    (
+        undefined extends DataT ?
+        (
+            PartialDocument<DataT, MetaT> &
+            {
+                meta : MetaT
+            }
+        ) :
+        null extends DataT ?
+        (
+            PartialDocument<DataT, MetaT> &
+            {
+                meta : MetaT
+            }
+        ) :
+        (
+            PartialDocument<DataT, MetaT> &
+            {
+                data : DataT,
+                meta : MetaT
+            }
+        )
+    )
+);
+export function document<
+    DataF extends sd.AnyAssertFunc
+> (
+    dataF : DataF
+) : (
+    Document<
+        sd.TypeOf<DataF>,
+        undefined
+    > extends never ?
+        never :
+        (
+            sd.AssertDelegate<Document<
+                sd.TypeOf<DataF>,
+                undefined
+            >> &
+            {
+                __accepts : (
+                    Document<
+                        sd.AcceptsOf<DataF>,
+                        undefined
+                    >
+                )
+            }
+        )
+);
+export function document<
+    DataF extends sd.AnyAssertFunc,
+    MetaF extends sd.AssertFunc<undefined|null|Meta>
+> (
+    dataF : DataF,
+    metaF : MetaF
+) : (
+    Document<
+        sd.TypeOf<DataF>,
+        sd.TypeOf<MetaF>
+    > extends never ?
+        never :
+        (
+            sd.AssertDelegate<Document<
+                sd.TypeOf<DataF>,
+                sd.TypeOf<MetaF>
+            >> &
+            {
+                __accepts : (
+                    Document<
+                        sd.AcceptsOf<DataF>,
+                        sd.AcceptsOf<MetaF>
+                    >
+                )
+            }
+        )
+);
+export function document<
+    DataF extends sd.AnyAssertFunc,
+    MetaF extends sd.AssertFunc<undefined|null|Meta>
+> (
+    dataF : DataF,
+    metaF? : MetaF
+) : (
+    Document<
+        sd.TypeOf<DataF>,
+        sd.TypeOf<MetaF>
+    > extends never ?
+        never :
+        (
+            sd.AssertDelegate<Document<
+                sd.TypeOf<DataF>,
+                sd.TypeOf<MetaF>
+            >> &
+            {
+                __accepts : (
+                    Document<
+                        sd.AcceptsOf<DataF>,
+                        sd.AcceptsOf<MetaF>
+                    >
+                )
+            }
+        )
+) {
+    if (metaF == undefined) {
+        //Kind of a hacky implementation
+        metaF = sd.undef() as MetaF;
+    }
+    const dataOptional = (sd.isOptional(dataF) || sd.isNullable(dataF));
+    const metaOptional = (sd.isOptional(metaF) || sd.isNullable(metaF));
+
+    if (dataOptional && metaOptional) {
+        throw new Error(`'data' and 'meta' fields of a JSON API document cannot both be optional; makes it possible for both to be missing without setting 'errors'`);
+    }
+
+    if (dataOptional) {
+        return sd.intersect(
+            partialDocument(
+                dataF,
+                metaF
+            ),
+            sd.toSchema({
+                meta : sd.notMaybe(metaF)
+            })
+        ) as any;
+    } else if (metaOptional) {
+        return sd.intersect(
+            partialDocument(
+                dataF,
+                metaF
+            ),
+            sd.toSchema({
+                data : sd.notMaybe(dataF)
+            })
+        ) as any;
+    } else {
+        return sd.intersect(
+            partialDocument(
+                dataF,
+                metaF
+            ),
+            sd.toSchema({
+                data : sd.notMaybe(dataF),
+                meta : sd.notMaybe(metaF),
+            })
+        ) as any;
+    }
+}
+
+export type ServerDocument<DataT, MetaT extends undefined|null|Meta> = (
+    Document<DataT, MetaT> &
+    {
+        included? : undefined|null|(ServerResource[])
+    }
+);
+export function serverDocument<
+    DataF extends sd.AnyAssertFunc
+> (
+    dataF : DataF
+) : (
+    ServerDocument<
+        sd.TypeOf<DataF>,
+        undefined
+    > extends never ?
+        never :
+        (
+            sd.AssertDelegate<ServerDocument<
+                sd.TypeOf<DataF>,
+                undefined
+            >> &
+            {
+                __accepts : (
+                    ServerDocument<
+                        sd.AcceptsOf<DataF>,
+                        undefined
+                    >
+                )
+            }
+        )
+);
+export function serverDocument<
+    DataF extends sd.AnyAssertFunc,
+    MetaF extends sd.AssertFunc<undefined|null|Meta>
+> (
+    dataF : DataF,
+    metaF : MetaF
+) : (
+    ServerDocument<
+        sd.TypeOf<DataF>,
+        sd.TypeOf<MetaF>
+    > extends never ?
+        never :
+        (
+            sd.AssertDelegate<ServerDocument<
+                sd.TypeOf<DataF>,
+                sd.TypeOf<MetaF>
+            >> &
+            {
+                __accepts : (
+                    ServerDocument<
+                        sd.AcceptsOf<DataF>,
+                        sd.AcceptsOf<MetaF>
+                    >
+                )
+            }
+        )
+);
+export function serverDocument<
+    DataF extends sd.AnyAssertFunc,
+    MetaF extends sd.AssertFunc<undefined|null|Meta>
+> (
+    dataF : DataF,
+    metaF? : MetaF
+) : (
+    ServerDocument<
+        sd.TypeOf<DataF>,
+        sd.TypeOf<MetaF>
+    > extends never ?
+        never :
+        (
+            sd.AssertDelegate<ServerDocument<
+                sd.TypeOf<DataF>,
+                sd.TypeOf<MetaF>
+            >> &
+            {
+                __accepts : (
+                    ServerDocument<
+                        sd.AcceptsOf<DataF>,
+                        sd.AcceptsOf<MetaF>
+                    >
+                )
+            }
+        )
+) {
+    if (metaF == undefined) {
+        //Kind of a hacky implementation
+        metaF = sd.undef() as MetaF;
+    }
+    const result = sd.intersect(
+        document(dataF, metaF),
+        sd.toSchema({
+            included : sd.maybe(sd.array(serverResource))
+        })
+    ) as any;
+    return result as any;
+}

@@ -6,26 +6,15 @@
 
 ```
 import * as sd from "schema-decorator";
+import * as jsonApi from "json-api-schema";
 
-class MyData {
-    @sd.assert(sd.naturalNumber())
-    var : number = 0;
-}
-const assertWithCtor = createDocumentWithCtor(MyData).assertDelegate;
-assertWithCtor("test", {
-    data : {
-        var : 34
-    },
+const doc = jsonApi.document(sd.naturalNumber());
+doc("test", {
+    data : 34,
 }); //OK
-assertWithCtor("test", {
-    data : {
-        var : 34.5
-    },
-}); //Error, var must be a natural number
-assertWithCtor("test", {
+doc("test", {
+    data : 34.5,
+}); //Error, data must be a natural number
+doc("test", {
 }); //Error, must have one of the following, data, errors, meta
 ```
-
-### TODO
-
-Assertions for the various `meta`, `attributes`, etc.
