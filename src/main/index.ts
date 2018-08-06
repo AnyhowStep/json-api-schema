@@ -25,6 +25,7 @@ export const anyDictionary : sd.AssertDelegate<AnyDictionary> = (
 //http://jsonapi.org/format
 //The following is made with the v1.0 spec
 export type Meta = AnyDictionary;
+export type OptionalMeta = undefined|null|Meta;
 export const meta : sd.AssertDelegate<Meta> = anyDictionary;
 
 export interface Link {
@@ -201,7 +202,7 @@ export const jsonApi : sd.AssertDelegate<JsonApi> = sd.toSchema({
     meta : sd.maybe(meta),
 });
 
-export interface PartialDocument<DataT, MetaT extends undefined|null|Meta> {
+export interface PartialDocument<DataT, MetaT extends OptionalMeta=undefined> {
     //http://jsonapi.org/format/#document-top-level
     //A document MUST contain at least one of the following top-level members:
     //The members data and errors MUST NOT coexist in the same document.
@@ -214,47 +215,62 @@ export interface PartialDocument<DataT, MetaT extends undefined|null|Meta> {
     links? : undefined|null|LinkCollection,
     included? : undefined|null|(Resource[])|(ServerResource[]),
 }
-export function partialDocument<
-    DataF extends sd.AnyAssertFunc,
-    MetaF extends sd.AssertFunc<undefined|null|Meta>
-> (
-    dataF : DataF,
+export type MetaAssertFunc = undefined|sd.AssertFunc<OptionalMeta>;
+export type TypeOfMetaAssertFunc<MetaF extends MetaAssertFunc> = (
+    Extract<MetaF, undefined>|sd.TypeOf<Exclude<MetaF, undefined>>
+);
+export type AcceptsOfMetaAssertFunc<MetaF extends MetaAssertFunc> = (
+    Extract<MetaF, undefined>|sd.AcceptsOf<Exclude<MetaF, undefined>>
+);
+export type MetaAssertDelegate<MetaF extends MetaAssertFunc> = (
+    sd.AssertDelegate<TypeOfMetaAssertFunc<MetaF>> &
+    {
+        __accepts : (
+            AcceptsOfMetaAssertFunc<MetaF>
+        )
+    }
+);
+export function toMetaAssertDelegate<MetaF extends MetaAssertFunc> (
     metaF : MetaF
-) : (
+) : MetaAssertDelegate<MetaF> {
+    if (metaF == undefined) {
+        return sd.undef() as any;
+    } else {
+        //This should be fine because we checked it was not null
+        const f : Exclude<MetaF, undefined> = metaF as any;
+        return sd.toAssertDelegateExact(f);
+    }
+}
+export type PartialDocumentAssertDelegate<
+    DataF extends sd.AnyAssertFunc,
+    MetaF extends MetaAssertFunc=undefined
+> = (
     sd.AssertDelegate<PartialDocument<
         sd.TypeOf<DataF>,
-        sd.TypeOf<MetaF>
+        TypeOfMetaAssertFunc<MetaF>
     >> &
     {
         __accepts : (
             PartialDocument<
                 sd.AcceptsOf<DataF>,
-                sd.AcceptsOf<MetaF>
+                AcceptsOfMetaAssertFunc<MetaF>
             >
         )
     }
+);
+export function partialDocument<
+    DataF extends sd.AnyAssertFunc,
+    MetaF extends MetaAssertFunc=undefined
+> (
+    dataF : DataF,
+    metaF? : MetaF
+) : (
+    PartialDocumentAssertDelegate<DataF, MetaF>
 ) {
-    const r : (
-        sd.AssertDelegate<PartialDocument<
-            sd.TypeOf<DataF>,
-            //This `any` hack is because TS has a problem with
-            //Mapping `T extends { [field : string] : any }`
-            any
-        >> &
-        {
-            __accepts : (
-                PartialDocument<
-                    sd.AcceptsOf<DataF>,
-                    //This `any` hack is because TS has a problem with
-                    //Mapping `T extends { [field : string] : any }`
-                    any
-                >
-            )
-        }
-    ) = sd.toSchema({
+    return sd.toSchema({
         data : sd.maybe(dataF),
         errors : sd.maybe(sd.array(errorObject)),
-        meta : sd.maybe(metaF),
+        meta : sd.maybe(toMetaAssertDelegate(metaF)),
 
         jsonapi : sd.maybe(jsonApi),
         links : sd.maybe(linkCollection),
@@ -263,7 +279,6 @@ export function partialDocument<
             sd.array(serverResource)
         ))
     });
-    return r;
 }
 
 /*
@@ -278,109 +293,116 @@ export function partialDocument<
     + errors, meta
     + meta
 */
-//Cannot have both DataT, and MetaT have undefined|null
-export type Document<DataT, MetaT extends undefined|null|Meta> = (
-    undefined extends MetaT ?
-    (
-        undefined extends DataT ?
-        //Cannot both have undefined|null
-        never :
-        null extends DataT ?
-        //Cannot both have undefined|null
-        never :
-        (
-            PartialDocument<DataT, MetaT> &
-            {
-                data : DataT
-            }
-        )
-    ) :
-    null extends MetaT ?
-    (
-        undefined extends DataT ?
-        //Cannot both have undefined|null
-        never :
-        null extends DataT ?
-        //Cannot both have undefined|null
-        never :
-        (
-            PartialDocument<DataT, MetaT> &
-            {
-                data : DataT
-            }
-        )
-    ) :
-    (
-        undefined extends DataT ?
-        (
-            PartialDocument<DataT, MetaT> &
-            {
-                meta : MetaT
-            }
-        ) :
-        null extends DataT ?
-        (
-            PartialDocument<DataT, MetaT> &
-            {
-                meta : MetaT
-            }
-        ) :
-        (
-            PartialDocument<DataT, MetaT> &
-            {
-                data : DataT,
-                meta : MetaT
-            }
-        )
-    )
+//If `IsOptional<>` extends `true`, then it is optional
+export type IsOptional<T> = (
+    true extends (
+        (undefined extends T ? true : false) |
+        (null extends T ? true : false)
+    ) ?
+        true :
+        false
 );
-export function document<
-    DataF extends sd.AnyAssertFunc
-> (
+export function isOptional (f : sd.AnyAssertFunc) : boolean {
+    return sd.isOptional(f) || sd.isNullable(f);
+}
+//If `IsBothOptional<>` extends `true`, then both are optional
+export type IsBothOptional<T, U> = (
+    IsOptional<T> | IsOptional<U>
+);
+export function isBothOptional (f0 : sd.AnyAssertFunc, f1 : sd.AnyAssertFunc) : boolean {
+    return isOptional(f0) && isOptional(f1);
+}
+
+export type DocumentData<DataT> = (
+    IsOptional<DataT> extends true ?
+        {} :
+        {
+            data : DataT
+        }
+);
+export type DocumentDataAssertDelegate<DataF extends sd.AnyAssertFunc> = (
+    sd.AssertDelegate<DocumentData<sd.TypeOf<DataF>>> &
+    {
+        __accepts : (
+            DocumentData<sd.AcceptsOf<DataF>>
+        )
+    }
+);
+export function toDocumentDataAssertDelegate<DataF extends sd.AnyAssertFunc> (
     dataF : DataF
-) : (
-    Document<
-        sd.TypeOf<DataF>,
-        undefined
-    > extends never ?
-        never :
-        (
-            sd.AssertDelegate<Document<
-                sd.TypeOf<DataF>,
-                undefined
-            >> &
-            {
-                __accepts : (
-                    Document<
-                        sd.AcceptsOf<DataF>,
-                        undefined
-                    >
-                )
-            }
-        )
+) : DocumentDataAssertDelegate<DataF> {
+    const result = isOptional(dataF) ?
+        sd.toSchema({}) :
+        sd.toSchema({
+            data : sd.notMaybe(dataF)
+        });
+    return result as any;
+}
+export type DocumentMeta<MetaT extends OptionalMeta> = (
+    IsOptional<MetaT> extends true ?
+        {} :
+        {
+            meta : MetaT
+        }
 );
-export function document<
-    DataF extends sd.AnyAssertFunc,
-    MetaF extends sd.AssertFunc<undefined|null|Meta>
-> (
-    dataF : DataF,
+export type DocumentMetaAssertDelegate<MetaF extends MetaAssertFunc> = (
+    sd.AssertDelegate<DocumentMeta<TypeOfMetaAssertFunc<MetaF>>> &
+    {
+        __accepts : (
+            DocumentMeta<AcceptsOfMetaAssertFunc<MetaF>>
+        )
+    }
+);
+export function toDocumentMetaAssertDelegate<MetaF extends MetaAssertFunc> (
     metaF : MetaF
-) : (
+) : DocumentMetaAssertDelegate<MetaF> {
+    const metaD = toMetaAssertDelegate(metaF);
+    const result = isOptional(metaD) ?
+        sd.toSchema({}) :
+        sd.toSchema({
+            meta : sd.notMaybe(metaD)
+        });
+    return result as any;
+}
+
+//Cannot have both DataT, and MetaT have undefined|null
+export type Document<DataT, MetaT extends OptionalMeta=undefined> = (
+    IsBothOptional<DataT, MetaT> extends true ?
+        //Cannot both have undefined|null
+        never :
+        {
+            [k in keyof (
+                PartialDocument<DataT, MetaT> &
+                DocumentData<DataT> &
+                DocumentMeta<MetaT>
+            )] : (
+                (
+                    PartialDocument<DataT, MetaT> &
+                    DocumentData<DataT> &
+                    DocumentMeta<MetaT>
+                )[k]
+            )
+        }
+);
+export type DocumentAssertDelegate<
+    DataF extends sd.AnyAssertFunc,
+    MetaF extends MetaAssertFunc=undefined
+> = (
     Document<
         sd.TypeOf<DataF>,
-        sd.TypeOf<MetaF>
+        TypeOfMetaAssertFunc<MetaF>
     > extends never ?
         never :
         (
             sd.AssertDelegate<Document<
                 sd.TypeOf<DataF>,
-                sd.TypeOf<MetaF>
+                TypeOfMetaAssertFunc<MetaF>
             >> &
             {
                 __accepts : (
                     Document<
                         sd.AcceptsOf<DataF>,
-                        sd.AcceptsOf<MetaF>
+                        AcceptsOfMetaAssertFunc<MetaF>
                     >
                 )
             }
@@ -388,102 +410,52 @@ export function document<
 );
 export function document<
     DataF extends sd.AnyAssertFunc,
-    MetaF extends sd.AssertFunc<undefined|null|Meta>
+    MetaF extends MetaAssertFunc=undefined
 > (
     dataF : DataF,
     metaF? : MetaF
 ) : (
-    Document<
-        sd.TypeOf<DataF>,
-        sd.TypeOf<MetaF>
-    > extends never ?
-        never :
-        (
-            sd.AssertDelegate<Document<
-                sd.TypeOf<DataF>,
-                sd.TypeOf<MetaF>
-            >> &
-            {
-                __accepts : (
-                    Document<
-                        sd.AcceptsOf<DataF>,
-                        sd.AcceptsOf<MetaF>
-                    >
-                )
-            }
-        )
+    DocumentAssertDelegate<DataF, MetaF>
 ) {
-    if (metaF == undefined) {
-        //Kind of a hacky implementation
-        metaF = sd.undef() as MetaF;
-    }
-    const dataOptional = (sd.isOptional(dataF) || sd.isNullable(dataF));
-    const metaOptional = (sd.isOptional(metaF) || sd.isNullable(metaF));
-
-    if (dataOptional && metaOptional) {
+    const metaD = toMetaAssertDelegate(metaF);
+    if (isBothOptional(dataF, metaD)) {
         throw new Error(`'data' and 'meta' fields of a JSON API document cannot both be optional; makes it possible for both to be missing without setting 'errors'`);
     }
-
-    if (dataOptional) {
-        return sd.intersect(
-            partialDocument(
-                dataF,
-                metaF
-            ),
-            sd.toSchema({
-                meta : sd.notMaybe(metaF)
-            })
-        ) as any;
-    } else if (metaOptional) {
-        return sd.intersect(
-            partialDocument(
-                dataF,
-                metaF
-            ),
-            sd.toSchema({
-                data : sd.notMaybe(dataF)
-            })
-        ) as any;
-    } else {
-        return sd.intersect(
-            partialDocument(
-                dataF,
-                metaF
-            ),
-            sd.toSchema({
-                data : sd.notMaybe(dataF),
-                meta : sd.notMaybe(metaF),
-            })
-        ) as any;
-    }
+    const result = sd.intersect(
+        partialDocument(
+            dataF,
+            metaD
+        ),
+        toDocumentDataAssertDelegate(dataF),
+        toDocumentMetaAssertDelegate(metaD)
+    );
+    return result as any;
 }
-
-export type ServerDocument<DataT, MetaT extends undefined|null|Meta> = (
+export type ServerDocument<DataT, MetaT extends OptionalMeta=undefined> = (
     Document<DataT, MetaT> &
     {
         included? : undefined|null|(ServerResource[])
     }
 );
-export function serverDocument<
-    DataF extends sd.AnyAssertFunc
-> (
-    dataF : DataF
-) : (
+export type ServerDocumentAssertDelegate<
+    DataF extends sd.AnyAssertFunc,
+    MetaF extends MetaAssertFunc=undefined
+> = (
     ServerDocument<
         sd.TypeOf<DataF>,
-        undefined
+        TypeOfMetaAssertFunc<MetaF>
     > extends never ?
         never :
         (
             sd.AssertDelegate<ServerDocument<
                 sd.TypeOf<DataF>,
-                undefined
+                TypeOfMetaAssertFunc<MetaF>
             >> &
             {
                 __accepts : (
                     ServerDocument<
                         sd.AcceptsOf<DataF>,
-                        undefined
+                        AcceptsOfMetaAssertFunc<MetaF>
                     >
                 )
             }
@@ -491,67 +463,18 @@ export function serverDocument<
 );
 export function serverDocument<
     DataF extends sd.AnyAssertFunc,
-    MetaF extends sd.AssertFunc<undefined|null|Meta>
-> (
-    dataF : DataF,
-    metaF : MetaF
-) : (
-    ServerDocument<
-        sd.TypeOf<DataF>,
-        sd.TypeOf<MetaF>
-    > extends never ?
-        never :
-        (
-            sd.AssertDelegate<ServerDocument<
-                sd.TypeOf<DataF>,
-                sd.TypeOf<MetaF>
-            >> &
-            {
-                __accepts : (
-                    ServerDocument<
-                        sd.AcceptsOf<DataF>,
-                        sd.AcceptsOf<MetaF>
-                    >
-                )
-            }
-        )
-);
-export function serverDocument<
-    DataF extends sd.AnyAssertFunc,
-    MetaF extends sd.AssertFunc<undefined|null|Meta>
+    MetaF extends MetaAssertFunc=undefined
 > (
     dataF : DataF,
     metaF? : MetaF
 ) : (
-    ServerDocument<
-        sd.TypeOf<DataF>,
-        sd.TypeOf<MetaF>
-    > extends never ?
-        never :
-        (
-            sd.AssertDelegate<ServerDocument<
-                sd.TypeOf<DataF>,
-                sd.TypeOf<MetaF>
-            >> &
-            {
-                __accepts : (
-                    ServerDocument<
-                        sd.AcceptsOf<DataF>,
-                        sd.AcceptsOf<MetaF>
-                    >
-                )
-            }
-        )
+    ServerDocumentAssertDelegate<DataF, MetaF>
 ) {
-    if (metaF == undefined) {
-        //Kind of a hacky implementation
-        metaF = sd.undef() as MetaF;
-    }
     const result = sd.intersect(
         document(dataF, metaF),
         sd.toSchema({
             included : sd.maybe(sd.array(serverResource))
         })
-    ) as any;
+    );
     return result as any;
 }

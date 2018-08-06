@@ -1,6 +1,6 @@
 {
   "name": "@anyhowstep/json-api-schema",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Validates a json-api object",
   "main": "dist/src/main/index.js",
   "types": "dist/src/main/index.d.ts",
@@ -16,7 +16,7 @@
     "url": "https://github.com/AnyhowStep/json-api-schema"
   },
   "dependencies": {
-    "schema-decorator": "^2.3.0"
+    "schema-decorator": "^2.6.0"
   },
   "devDependencies": {
     "@types/tape": "^4.2.32",

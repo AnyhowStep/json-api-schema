@@ -71,51 +71,65 @@ exports.jsonApi = sd.toSchema({
     version: sd.maybe(sd.literal("1.0")),
     meta: sd.maybe(exports.meta),
 });
+function toMetaAssertDelegate(metaF) {
+    if (metaF == undefined) {
+        return sd.undef();
+    }
+    else {
+        //This should be fine because we checked it was not null
+        const f = metaF;
+        return sd.toAssertDelegateExact(f);
+    }
+}
+exports.toMetaAssertDelegate = toMetaAssertDelegate;
 function partialDocument(dataF, metaF) {
-    const r = sd.toSchema({
+    return sd.toSchema({
         data: sd.maybe(dataF),
         errors: sd.maybe(sd.array(exports.errorObject)),
-        meta: sd.maybe(metaF),
+        meta: sd.maybe(toMetaAssertDelegate(metaF)),
         jsonapi: sd.maybe(exports.jsonApi),
         links: sd.maybe(exports.linkCollection),
         included: sd.maybe(sd.or(sd.array(exports.resource), sd.array(exports.serverResource)))
     });
-    return r;
 }
 exports.partialDocument = partialDocument;
+function isOptional(f) {
+    return sd.isOptional(f) || sd.isNullable(f);
+}
+exports.isOptional = isOptional;
+function isBothOptional(f0, f1) {
+    return isOptional(f0) && isOptional(f1);
+}
+exports.isBothOptional = isBothOptional;
+function toDocumentDataAssertDelegate(dataF) {
+    const result = isOptional(dataF) ?
+        sd.toSchema({}) :
+        sd.toSchema({
+            data: sd.notMaybe(dataF)
+        });
+    return result;
+}
+exports.toDocumentDataAssertDelegate = toDocumentDataAssertDelegate;
+function toDocumentMetaAssertDelegate(metaF) {
+    const metaD = toMetaAssertDelegate(metaF);
+    const result = isOptional(metaD) ?
+        sd.toSchema({}) :
+        sd.toSchema({
+            meta: sd.notMaybe(metaD)
+        });
+    return result;
+}
+exports.toDocumentMetaAssertDelegate = toDocumentMetaAssertDelegate;
 function document(dataF, metaF) {
-    if (metaF == undefined) {
-        //Kind of a hacky implementation
-        metaF = sd.undef();
-    }
-    const dataOptional = (sd.isOptional(dataF) || sd.isNullable(dataF));
-    const metaOptional = (sd.isOptional(metaF) || sd.isNullable(metaF));
-    if (dataOptional && metaOptional) {
+    const metaD = toMetaAssertDelegate(metaF);
+    if (isBothOptional(dataF, metaD)) {
         throw new Error(`'data' and 'meta' fields of a JSON API document cannot both be optional; makes it possible for both to be missing without setting 'errors'`);
     }
-    if (dataOptional) {
-        return sd.intersect(partialDocument(dataF, metaF), sd.toSchema({
-            meta: sd.notMaybe(metaF)
-        }));
-    }
-    else if (metaOptional) {
-        return sd.intersect(partialDocument(dataF, metaF), sd.toSchema({
-            data: sd.notMaybe(dataF)
-        }));
-    }
-    else {
-        return sd.intersect(partialDocument(dataF, metaF), sd.toSchema({
-            data: sd.notMaybe(dataF),
-            meta: sd.notMaybe(metaF),
-        }));
-    }
+    const result = sd.intersect(partialDocument(dataF, metaD), toDocumentDataAssertDelegate(dataF), toDocumentMetaAssertDelegate(metaD));
+    return result;
 }
 exports.document = document;
 function serverDocument(dataF, metaF) {
-    if (metaF == undefined) {
-        //Kind of a hacky implementation
-        metaF = sd.undef();
-    }
     const result = sd.intersect(document(dataF, metaF), sd.toSchema({
         included: sd.maybe(sd.array(exports.serverResource))
     }));

@@ -4,6 +4,7 @@ export declare type AnyDictionary = {
 };
 export declare const anyDictionary: sd.AssertDelegate<AnyDictionary>;
 export declare type Meta = AnyDictionary;
+export declare type OptionalMeta = undefined | null | Meta;
 export declare const meta: sd.AssertDelegate<Meta>;
 export interface Link {
     href: string;
@@ -85,7 +86,7 @@ export interface JsonApi {
     meta?: undefined | null | Meta;
 }
 export declare const jsonApi: sd.AssertDelegate<JsonApi>;
-export interface PartialDocument<DataT, MetaT extends undefined | null | Meta> {
+export interface PartialDocument<DataT, MetaT extends OptionalMeta = undefined> {
     data?: undefined | null | DataT;
     errors?: undefined | null | (ErrorObject[]);
     meta?: undefined | null | MetaT;
@@ -93,33 +94,46 @@ export interface PartialDocument<DataT, MetaT extends undefined | null | Meta> {
     links?: undefined | null | LinkCollection;
     included?: undefined | null | (Resource[]) | (ServerResource[]);
 }
-export declare function partialDocument<DataF extends sd.AnyAssertFunc, MetaF extends sd.AssertFunc<undefined | null | Meta>>(dataF: DataF, metaF: MetaF): (sd.AssertDelegate<PartialDocument<sd.TypeOf<DataF>, sd.TypeOf<MetaF>>> & {
-    __accepts: (PartialDocument<sd.AcceptsOf<DataF>, sd.AcceptsOf<MetaF>>);
+export declare type MetaAssertFunc = undefined | sd.AssertFunc<OptionalMeta>;
+export declare type TypeOfMetaAssertFunc<MetaF extends MetaAssertFunc> = (Extract<MetaF, undefined> | sd.TypeOf<Exclude<MetaF, undefined>>);
+export declare type AcceptsOfMetaAssertFunc<MetaF extends MetaAssertFunc> = (Extract<MetaF, undefined> | sd.AcceptsOf<Exclude<MetaF, undefined>>);
+export declare type MetaAssertDelegate<MetaF extends MetaAssertFunc> = (sd.AssertDelegate<TypeOfMetaAssertFunc<MetaF>> & {
+    __accepts: (AcceptsOfMetaAssertFunc<MetaF>);
 });
-export declare type Document<DataT, MetaT extends undefined | null | Meta> = (undefined extends MetaT ? (undefined extends DataT ? never : null extends DataT ? never : (PartialDocument<DataT, MetaT> & {
+export declare function toMetaAssertDelegate<MetaF extends MetaAssertFunc>(metaF: MetaF): MetaAssertDelegate<MetaF>;
+export declare type PartialDocumentAssertDelegate<DataF extends sd.AnyAssertFunc, MetaF extends MetaAssertFunc = undefined> = (sd.AssertDelegate<PartialDocument<sd.TypeOf<DataF>, TypeOfMetaAssertFunc<MetaF>>> & {
+    __accepts: (PartialDocument<sd.AcceptsOf<DataF>, AcceptsOfMetaAssertFunc<MetaF>>);
+});
+export declare function partialDocument<DataF extends sd.AnyAssertFunc, MetaF extends MetaAssertFunc = undefined>(dataF: DataF, metaF?: MetaF): (PartialDocumentAssertDelegate<DataF, MetaF>);
+export declare type IsOptional<T> = (true extends ((undefined extends T ? true : false) | (null extends T ? true : false)) ? true : false);
+export declare function isOptional(f: sd.AnyAssertFunc): boolean;
+export declare type IsBothOptional<T, U> = (IsOptional<T> | IsOptional<U>);
+export declare function isBothOptional(f0: sd.AnyAssertFunc, f1: sd.AnyAssertFunc): boolean;
+export declare type DocumentData<DataT> = (IsOptional<DataT> extends true ? {} : {
     data: DataT;
-})) : null extends MetaT ? (undefined extends DataT ? never : null extends DataT ? never : (PartialDocument<DataT, MetaT> & {
-    data: DataT;
-})) : (undefined extends DataT ? (PartialDocument<DataT, MetaT> & {
+});
+export declare type DocumentDataAssertDelegate<DataF extends sd.AnyAssertFunc> = (sd.AssertDelegate<DocumentData<sd.TypeOf<DataF>>> & {
+    __accepts: (DocumentData<sd.AcceptsOf<DataF>>);
+});
+export declare function toDocumentDataAssertDelegate<DataF extends sd.AnyAssertFunc>(dataF: DataF): DocumentDataAssertDelegate<DataF>;
+export declare type DocumentMeta<MetaT extends OptionalMeta> = (IsOptional<MetaT> extends true ? {} : {
     meta: MetaT;
-}) : null extends DataT ? (PartialDocument<DataT, MetaT> & {
-    meta: MetaT;
-}) : (PartialDocument<DataT, MetaT> & {
-    data: DataT;
-    meta: MetaT;
-})));
-export declare function document<DataF extends sd.AnyAssertFunc>(dataF: DataF): (Document<sd.TypeOf<DataF>, undefined> extends never ? never : (sd.AssertDelegate<Document<sd.TypeOf<DataF>, undefined>> & {
-    __accepts: (Document<sd.AcceptsOf<DataF>, undefined>);
+});
+export declare type DocumentMetaAssertDelegate<MetaF extends MetaAssertFunc> = (sd.AssertDelegate<DocumentMeta<TypeOfMetaAssertFunc<MetaF>>> & {
+    __accepts: (DocumentMeta<AcceptsOfMetaAssertFunc<MetaF>>);
+});
+export declare function toDocumentMetaAssertDelegate<MetaF extends MetaAssertFunc>(metaF: MetaF): DocumentMetaAssertDelegate<MetaF>;
+export declare type Document<DataT, MetaT extends OptionalMeta = undefined> = (IsBothOptional<DataT, MetaT> extends true ? never : {
+    [k in keyof (PartialDocument<DataT, MetaT> & DocumentData<DataT> & DocumentMeta<MetaT>)]: ((PartialDocument<DataT, MetaT> & DocumentData<DataT> & DocumentMeta<MetaT>)[k]);
+});
+export declare type DocumentAssertDelegate<DataF extends sd.AnyAssertFunc, MetaF extends MetaAssertFunc = undefined> = (Document<sd.TypeOf<DataF>, TypeOfMetaAssertFunc<MetaF>> extends never ? never : (sd.AssertDelegate<Document<sd.TypeOf<DataF>, TypeOfMetaAssertFunc<MetaF>>> & {
+    __accepts: (Document<sd.AcceptsOf<DataF>, AcceptsOfMetaAssertFunc<MetaF>>);
 }));
-export declare function document<DataF extends sd.AnyAssertFunc, MetaF extends sd.AssertFunc<undefined | null | Meta>>(dataF: DataF, metaF: MetaF): (Document<sd.TypeOf<DataF>, sd.TypeOf<MetaF>> extends never ? never : (sd.AssertDelegate<Document<sd.TypeOf<DataF>, sd.TypeOf<MetaF>>> & {
-    __accepts: (Document<sd.AcceptsOf<DataF>, sd.AcceptsOf<MetaF>>);
-}));
-export declare type ServerDocument<DataT, MetaT extends undefined | null | Meta> = (Document<DataT, MetaT> & {
+export declare function document<DataF extends sd.AnyAssertFunc, MetaF extends MetaAssertFunc = undefined>(dataF: DataF, metaF?: MetaF): (DocumentAssertDelegate<DataF, MetaF>);
+export declare type ServerDocument<DataT, MetaT extends OptionalMeta = undefined> = (Document<DataT, MetaT> & {
     included?: undefined | null | (ServerResource[]);
 });
-export declare function serverDocument<DataF extends sd.AnyAssertFunc>(dataF: DataF): (ServerDocument<sd.TypeOf<DataF>, undefined> extends never ? never : (sd.AssertDelegate<ServerDocument<sd.TypeOf<DataF>, undefined>> & {
-    __accepts: (ServerDocument<sd.AcceptsOf<DataF>, undefined>);
+export declare type ServerDocumentAssertDelegate<DataF extends sd.AnyAssertFunc, MetaF extends MetaAssertFunc = undefined> = (ServerDocument<sd.TypeOf<DataF>, TypeOfMetaAssertFunc<MetaF>> extends never ? never : (sd.AssertDelegate<ServerDocument<sd.TypeOf<DataF>, TypeOfMetaAssertFunc<MetaF>>> & {
+    __accepts: (ServerDocument<sd.AcceptsOf<DataF>, AcceptsOfMetaAssertFunc<MetaF>>);
 }));
-export declare function serverDocument<DataF extends sd.AnyAssertFunc, MetaF extends sd.AssertFunc<undefined | null | Meta>>(dataF: DataF, metaF: MetaF): (ServerDocument<sd.TypeOf<DataF>, sd.TypeOf<MetaF>> extends never ? never : (sd.AssertDelegate<ServerDocument<sd.TypeOf<DataF>, sd.TypeOf<MetaF>>> & {
-    __accepts: (ServerDocument<sd.AcceptsOf<DataF>, sd.AcceptsOf<MetaF>>);
-}));
+export declare function serverDocument<DataF extends sd.AnyAssertFunc, MetaF extends MetaAssertFunc = undefined>(dataF: DataF, metaF?: MetaF): (ServerDocumentAssertDelegate<DataF, MetaF>);
